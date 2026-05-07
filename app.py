@@ -202,7 +202,7 @@ features = [
 latest = df.sort_values('GAME_DATE').groupby('player_name').last().reset_index()
 X_latest = latest[features].fillna(0)
 latest['injury_risk'] = pipeline.predict_proba(X_latest)[:, 1]
-latest['risk_pct'] = (latest['injury_risk'] * 100).round(1)
+latest['risk_pct'] = (latest['injury_risk'] * 100).round(1).clip(0, 100)
 
 def risk_label(score):
     if score >= 60:
