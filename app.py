@@ -5,58 +5,23 @@ import pickle
 import shap
 import matplotlib.pyplot as plt
 
-st.cache_data.clear()
-st.cache_resource.clear()
-
 st.set_page_config(
     page_title='NBA Injury Risk',
     page_icon='🏀',
     layout='wide'
 )
 
-# ── Custom CSS ────────────────────────────────────────────────
 st.markdown("""
 <style>
-    /* Hide default Streamlit menu and footer */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
-    
-    /* Main background */
     .stApp {
         background-color: #0e1117;
     }
-    
-    /* Sidebar styling */
     [data-testid="stSidebar"] {
         background-color: #1a1d27;
         border-right: 1px solid #2d3748;
     }
-    
-    /* Navigation buttons */
-    .nav-button {
-        display: block;
-        width: 100%;
-        padding: 12px 16px;
-        margin: 4px 0;
-        border-radius: 8px;
-        border: none;
-        text-align: left;
-        font-size: 15px;
-        cursor: pointer;
-        transition: background-color 0.2s;
-        background-color: transparent;
-        color: #e2e8f0;
-    }
-    .nav-button:hover {
-        background-color: #2d3748;
-    }
-    .nav-button.active {
-        background-color: #2563eb;
-        color: white;
-        font-weight: 600;
-    }
-    
-    /* Risk cards */
     .risk-card-high {
         background: linear-gradient(135deg, #7f1d1d, #991b1b);
         border-radius: 12px;
@@ -90,8 +55,6 @@ st.markdown("""
         text-transform: uppercase;
         letter-spacing: 1px;
     }
-    
-    /* Player risk score display */
     .score-high {
         background: linear-gradient(135deg, #7f1d1d, #991b1b);
         border-radius: 16px;
@@ -123,8 +86,6 @@ st.markdown("""
         color: #cbd5e1;
         font-weight: 600;
     }
-    
-    /* Metric card */
     .metric-card {
         background-color: #1a1d27;
         border-radius: 12px;
@@ -147,8 +108,6 @@ st.markdown("""
         color: #64748b;
         margin-top: 6px;
     }
-    
-    /* Section headers */
     .section-header {
         font-size: 22px;
         font-weight: 700;
@@ -157,8 +116,6 @@ st.markdown("""
         padding-bottom: 8px;
         border-bottom: 2px solid #2d3748;
     }
-    
-    /* Info box */
     .info-box {
         background-color: #1e3a5f;
         border-left: 4px solid #3b82f6;
@@ -168,8 +125,6 @@ st.markdown("""
         color: #bfdbfe;
         font-size: 14px;
     }
-    
-    /* Warning box */
     .warning-box {
         background-color: #451a03;
         border-left: 4px solid #f59e0b;
@@ -182,7 +137,6 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# ── Load model and data ───────────────────────────────────────
 @st.cache_resource
 def load_model():
     with open('injury_model.pkl', 'rb') as f:
@@ -201,11 +155,10 @@ features = [
     'back_to_back_count_month', 'PTS', 'REB', 'AST'
 ]
 
-# ── Pre-compute risk scores ───────────────────────────────────
 latest = df.sort_values('GAME_DATE').groupby('player_name').last().reset_index()
 X_latest = latest[features].fillna(0)
 latest['injury_risk'] = pipeline.predict_proba(X_latest)[:, 1]
-latest['risk_pct'] = (latest['injury_risk'] * 100).round(1).clip(0, 100)
+latest['risk_pct'] = (latest['injury_risk'] * 100).clip(0, 100).round(1)
 
 def risk_label(score):
     if score >= 60:
@@ -217,23 +170,19 @@ def risk_label(score):
 
 latest['risk_level'] = latest['risk_pct'].apply(risk_label)
 
-# ── Sidebar ───────────────────────────────────────────────────
 with st.sidebar:
     st.markdown('## 🏀 NBA Injury Risk')
     st.markdown('---')
-    
     st.markdown('''
     **What is this?**  
     Predicts which NBA players are at risk of a soft tissue injury in the next 14 days — based on workload data.
     ''')
-    
     st.markdown('---')
     st.markdown('### Navigate')
-    
-    # Use session state to track current page
+
     if 'page' not in st.session_state:
         st.session_state.page = 'Home'
-    
+
     if st.button('🏠  Home', use_container_width=True):
         st.session_state.page = 'Home'
     if st.button('📊  League Dashboard', use_container_width=True):
@@ -242,25 +191,23 @@ with st.sidebar:
         st.session_state.page = 'Player Deep Dive'
     if st.button('👥  Team View', use_container_width=True):
         st.session_state.page = 'Team View'
-    
+
     st.markdown('---')
     st.markdown(f'*Currently viewing: **{st.session_state.page}***')
 
 page = st.session_state.page
 
-# ── HOME PAGE ─────────────────────────────────────────────────
+# ── HOME ──────────────────────────────────────────────────────
 if page == 'Home':
     st.markdown('# 🏀 NBA Player Injury Risk Dashboard')
     st.markdown('### Predicting soft tissue injuries before they happen')
     st.markdown('---')
-
     st.markdown('''
     NBA teams lose millions when star players get injured. This tool uses 
     **machine learning trained on 3 years of NBA workload data** to flag 
     players at elevated injury risk — before the injury happens.
     ''')
 
-    # Risk summary cards
     high_risk = len(latest[latest['risk_pct'] >= 60])
     medium_risk = len(latest[(latest['risk_pct'] >= 35) & (latest['risk_pct'] < 60)])
     low_risk = len(latest[latest['risk_pct'] < 35])
@@ -288,17 +235,14 @@ if page == 'Home':
     st.markdown('<br>', unsafe_allow_html=True)
     st.markdown('---')
 
-    # Top 5 highest risk
     st.markdown('<div class="section-header">⚠️ Highest Risk Players Right Now</div>', unsafe_allow_html=True)
     top5 = latest.nlargest(5, 'risk_pct')[['player_name', 'risk_pct', 'risk_level']]
     top5.columns = ['Player', 'Injury Risk %', 'Risk Level']
     st.dataframe(top5, use_container_width=True, hide_index=True)
 
     st.markdown('---')
-
-    # How it works
     st.markdown('<div class="section-header">How does the model work?</div>', unsafe_allow_html=True)
-    
+
     col1, col2 = st.columns(2)
     with col1:
         st.markdown('''
@@ -382,7 +326,7 @@ elif page == 'Player Deep Dive':
 
     selected_player = st.selectbox('Select a player:', sorted(df['player_name'].unique()))
     player_data = latest[latest['player_name'] == selected_player].iloc[0]
-    risk_pct = player_data['risk_pct']
+    risk_pct = float(round(player_data['risk_pct'], 1))
 
     col1, col2 = st.columns([1, 2])
 
@@ -391,38 +335,38 @@ elif page == 'Player Deep Dive':
             st.markdown(f'''
             <div class="score-high">
                 <div class="score-text">🔴 HIGH RISK</div>
-                <div class="score-number">{risk_pct}%</div>
+                <div class="score-number">{risk_pct:.1f}%</div>
                 <div class="score-text">injury probability</div>
             </div>''', unsafe_allow_html=True)
         elif risk_pct >= 35:
             st.markdown(f'''
             <div class="score-medium">
                 <div class="score-text">🟡 MEDIUM RISK</div>
-                <div class="score-number">{risk_pct}%</div>
+                <div class="score-number">{risk_pct:.1f}%</div>
                 <div class="score-text">injury probability</div>
             </div>''', unsafe_allow_html=True)
         else:
             st.markdown(f'''
             <div class="score-low">
                 <div class="score-text">🟢 LOW RISK</div>
-                <div class="score-number">{risk_pct}%</div>
+                <div class="score-number">{risk_pct:.1f}%</div>
                 <div class="score-text">injury probability</div>
             </div>''', unsafe_allow_html=True)
 
     with col2:
         st.markdown('<div class="section-header">Key Workload Signals</div>', unsafe_allow_html=True)
         m1, m2, m3 = st.columns(3)
-        
-        acwr = round(player_data['acute_chronic_ratio'], 2)
+
+        acwr = float(round(player_data['acute_chronic_ratio'], 2))
         acwr_delta = '⚠️ Above danger zone' if acwr > 1.5 else '✅ Normal range'
-        
+
         m1.markdown(f'''
         <div class="metric-card">
-            <div class="metric-value">{acwr}</div>
+            <div class="metric-value">{acwr:.2f}</div>
             <div class="metric-label">Acute:Chronic Ratio</div>
             <div class="metric-help">{acwr_delta}</div>
         </div>''', unsafe_allow_html=True)
-        
+
         b2b = int(player_data['back_to_back_count_month'])
         m2.markdown(f'''
         <div class="metric-card">
@@ -430,11 +374,11 @@ elif page == 'Player Deep Dive':
             <div class="metric-label">Back-to-Backs (Month)</div>
             <div class="metric-help">Consecutive game days</div>
         </div>''', unsafe_allow_html=True)
-        
-        mins = round(player_data['minutes_last_7_days'], 0)
+
+        mins = int(round(player_data['minutes_last_7_days'], 0))
         m3.markdown(f'''
         <div class="metric-card">
-            <div class="metric-value">{int(mins)}</div>
+            <div class="metric-value">{mins}</div>
             <div class="metric-label">Minutes Last 7 Days</div>
             <div class="metric-help">Total playing time</div>
         </div>''', unsafe_allow_html=True)
@@ -442,7 +386,6 @@ elif page == 'Player Deep Dive':
     st.markdown('<br>', unsafe_allow_html=True)
     st.markdown('---')
 
-    # SHAP
     st.markdown('<div class="section-header">Why is this player flagged?</div>', unsafe_allow_html=True)
     st.markdown('Each bar shows how much that feature pushed the risk score up (red) or down (blue).')
 
@@ -458,7 +401,6 @@ elif page == 'Player Deep Dive':
     shap.waterfall_plot(explainer(X_transformed)[0], show=False)
     st.pyplot(fig)
 
-    # Minutes trend
     st.markdown('---')
     st.markdown('<div class="section-header">Minutes Played — Last 20 Games</div>', unsafe_allow_html=True)
     st.markdown('Spikes in minutes can indicate elevated injury risk.')
@@ -512,7 +454,7 @@ elif page == 'Team View':
             st.markdown(f'''
             <div class="warning-box">
             ⚠️ <strong>{highest['Player']}</strong> is your highest risk player 
-            at {highest['Risk %']}% — consider managing their minutes carefully.
+            at {highest['Risk %']:.1f}% — consider managing their minutes carefully.
             </div>''', unsafe_allow_html=True)
         else:
             st.success('✅ All selected players are currently at low injury risk.')
