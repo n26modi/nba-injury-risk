@@ -5,6 +5,9 @@ import pickle
 import shap
 import matplotlib.pyplot as plt
 
+st.cache_data.clear()
+st.cache_resource.clear()
+
 st.set_page_config(
     page_title='NBA Injury Risk',
     page_icon='🏀',
